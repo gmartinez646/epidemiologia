@@ -1,0 +1,204 @@
+---
+title: "Trabajo Practico 4 - Metaanálisis"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Alumna: Martinez Gabriela
+
+#### Consigna Nº1: 
+
+Para este ejercicio utilizaremos la base de datos que elaborá extrayendo los datos de los resúmenes que le fueron enviados. Evaluaremos la influencia de dos variables sobre el efecto de la intervención FLCD-15 sobre la ocurrencia de alegría. Para esto deberá realizar meta-análisis utilizando alegría como evento, con las siguientes especificaciones:\
+
+a. Realizar un análisis estratificado, dividiendo a los estudios que se realizaron antes de 2013 y los que se realizaron de 2013 en adelante.
+
+```{r include=FALSE}
+library(meta)
+library(readxl)
+ma <- read_excel("C:/Users/nicolas.ibarra/Downloads/Personal/Meta analisis/base_ejercicio_MA.xlsx")
+
+```
+**Metaanálisis estratificado**
+```{r}
+ma_estra_anio<-metabin(aleg_interv, N_interv,aleg_control, N_control, data=ma, studlab= paste(Estudio,"(", year, ")",sep = ""), subgroup = ifelse(year>2013,">2013","<2013"), fixed= F)
+```
+**Summary**
+```{r}
+summary(ma_estra_anio)
+```
+**Forrest Plot**
+```{r}
+forest(ma_estra_anio)
+```
+
+b. Realizar una metaregresión utilizando la variable "year" como regresora.
+
+```{r}
+mimeta<-metabin(aleg_interv, N_interv,aleg_control, N_control, data=ma, studlab= paste(Estudio,"(", year, ")",sep = ""),fixed= F)
+regxyear<-metareg(mimeta, year)
+bubble(regxyear, col = ifelse(ma$year>2013,"red","blue"), bg = ifelse(ma$year>2013,"red","blue"),  col.line = "skyblue")
+```
+
+c. Crear una variable que se llame "calidad" que indicará en una escala supuesta la calidad de los estudios. Los valores de esta variables deberán ser los siguientes:
+
+- Iluso et al 	8
+- Cónico et al	9
+- Payaso et al	4
+- Curioso et al	2
+- Honesto et al	6
+- Cándido et al	7
+- Random et al	10
+- Patán et al	5
+- Optimista et al	3
+- Crédulo et al	1
+
+```{r}
+ma$calidad<-c(8,9,4,2,6,7,10,5,3,1)
+```
+```{r, include=FALSE}
+attach(ma)
+```
+
+d. Realizar una metaregresión con la variable calidad como regresora.
+
+```{r}
+reg2<-metareg(mimeta, calidad)
+summary(reg2)
+```
+
+e. Realizar un Bubble plot con la variable "calidad" como regresora y cambiar el color de las burbujas.
+
+```{r}
+bubble(reg2, col = "red", bg = "red",  col.line = "blue")
+```
+
+f. Realizar una metaregresión con las variables "year" y "calidad" como regresoras.
+
+```{r}
+reg3<-metareg(mimeta, year+calidad)
+summary(reg3)
+```
+
+#### Consigna Nº2:
+En la base de datos "atc_mv" que se le entregá para la actividad de clase se encuentran los datos un meta-análisis de datos observacionales 
+sobre los efectos de la angioplastia de múltiples vasos en comparación con la angioplastia del vaso culpable en pacientes con síndromes coronarios agudos
+sin elevación del ST (abrir la arteria responsable del cuadro clínico o abrir todas las arterias que tienen obstrucciones en la angiografía coronaria). Con estos datos:\
+
+a. Realice un meta-análisis de los estimadores ajustados, utilizando como evento (punto final) "muerte_iam" (que indica la ocurrencia del punto final combinado muerte o re-infarto).
+
+```{r, include=FALSE}
+library(readxl)
+atc_mv <- read_excel("C:/Users/nicolas.ibarra/Downloads/Personal/Meta analisis/atc_mv.xlsx")
+attach(atc_mv)
+```
+**Metaanálisis y summary**
+```{r}
+atc_mv$se_muerte<-(log(atc_mv$uci_muerte)-log(atc_mv$rr_muerte))/1.96
+
+ma1<-metagen(log(rr_muerte), se_muerte, data= atc_mv, studlab= paste(Nombre,"(", Year, ")",sep = ""), sm= "HR", fixed= T)
+summary(ma1)
+```
+**Forrest Plot**
+```{r}
+forest(ma1, allstudies = F, leftcols = c("Nombre","N_interv","N_control"),comb.fixed= T)
+```
+\
+b. Cuantos estudios ingresan en el análisis (es decir que reportaron los estimadores del efecto ajustados).\
+**Ingresaron 6 estudios**\
+c. Cuantos pacientes aportan datos para este análisis en cada grupo?\
+**en el grupo interv: 2395**\
+**en el grupo control: 2439**\
+d. Cuantos pacientes hubieran aportado datos en caso de que TODOS los estudios hubieran reportado este estimador ajustado?
+
+```{r}
+sum(atc_mv$N_control,atc_mv$N_interv)
+```
+e. Realice un funnel plot del meta-análisis con estimadores ajustados.
+
+```{r}
+funnel(ma1)
+```
+
+#### Consigna Nº3:
+Con la base de datos "vni_eap" que utilizamos en la actividad práctica realice un meta-análisis en red, con los siguientes eventos:
+a. "muerte"
+b. "po2" (presión parcial de oxígeno a la hora del comienzo del tratamiento").
+c. En ambos casos utilice el "Control" como grupo de referencia.
+d. Realice un forest plot que resuma toda la evidencia disponible y un forest plot que diferencie la evidencia directa de la indirecta.
+
+```{r, include=FALSE}
+library(readxl)
+library(netmeta)
+eap <- read_excel("C:/Users/nicolas.ibarra/Downloads/Personal/Meta analisis/vni_eap.xlsx")
+attach(eap)
+```
+```{r}
+eap<-eap[-c(42:44), ]
+p<-pairwise(tratamiento, Muerte, n, data= eap, studlab= paste(autor,"(", year, ")",sep = ""))
+p
+```
+```{r}
+ma_red<-netmeta(p)
+summary(ma_red)
+```
+```{r}
+netgraph(ma_red)
+```
+```{r}
+forest(ma_red, reference.group= "Control", drop.reference.group = T)
+```
+```{r}
+ns<-netsplit(ma_red)
+forest(ns)
+```
+```{r}
+p2<-pairwise(tratamiento, mean= po2, n= n, sd=ds_po2, data= eap, studlab= paste(autor,"(", year, ")",sep = ""))
+ma_red2<-netmeta(p2)
+summary(ma_red2)
+```
+```{r}
+forest(ma_red2, reference.group= "Control", drop.reference.group = T)
+```
+```{r}
+ns2<-netsplit(ma_red2)
+forest(ns2)
+```
+
+#### Consigna Nº4:
+
+La base de datos "ejercicio_MA_red" contiene los datos de un meta-análisis de diversas drogas en distintas dosis para un forma de epilepsia. Con estos datos:\
+a. Realice un meta-análisis en red utilizando  "evento1" como evento.
+b. Realice el gráfico que muestra la red de evidencia.
+c. Realice un forest plot que resuma la evidencia directa e indirecta por separado.
+d. Realice un ranking de los tratamientos.
+
+```{r, include=FALSE}
+library(readxl)
+MA_red <- read_excel("C:/Users/nicolas.ibarra/Downloads/Personal/Meta analisis/MA_red.xlsx", sheet = "Hoja2")
+```
+```{r}
+p3<-pairwise(tratamiento,evento1, reference.group = "Placebo", n= aleatorizados, data= MA_red, studlab= paste(Autor,"(", Year, ")",sep = ""))
+ma_red3<-netmeta(p3)
+summary(ma_red3)
+```
+```{r}
+netgraph(ma_red3)
+```
+```{r fig.height=15}
+forest(ma_red3)
+```
+```{r}
+ns3<-netsplit(ma_red3)
+forest(ns3, show="direct.only", direct=TRUE, indirect= F)
+```
+```{r fig.height=185}
+forest(ns3, show="indirect.only", direct=F, indirect= T)
+```
+```{r}
+netrank(ma_red3)
+```
